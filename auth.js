@@ -1,284 +1,161 @@
 // ═══════════════════════════════════════════════════════
-// auth.js  ·  Mystery Chat
-// Username+Password auth via Firestore (custom, no Firebase Auth)
-// Flow: check user exists → password → login or register
+// auth.js · Mystery Chat v2
+// Username+Password · Register · Change Password
 // ═══════════════════════════════════════════════════════
-
-import { firestore }    from "./firebase-config.js";
-import { showToast, showAuthStep, showScreen, setButtonLoading, showModal } from "./ui-animations.js";
-
+import { firestore } from "./firebase-config.js";
+import { showToast, showAuthStep, showModal, setButtonLoading } from "./ui-animations.js";
 import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  query,
-  where,
-  getDocs,
-  serverTimestamp,
+  doc, getDoc, setDoc, updateDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// In-memory session state
-export const session = {
-  uid:         null,
-  username:    null,
-  displayName: null,
-  bio:         "",
-  rep:         0,
-};
+export const session = { uid: null, username: null, displayName: null, bio: "", rep: 0, avatarUrl: null };
 
-// Simple hash using SHA-256 via Web Crypto (no external libs)
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data     = encoder.encode(password + "mystery_salt_smashh_2024");
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray  = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str + "_mc_salt_v2"));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-// ── INIT AUTH UI ──
 export function initAuth(onSuccess) {
-  const btnUsernameMode  = document.getElementById("btn-username");
-  const btnContinueUser  = document.getElementById("btn-continue-username");
-  const btnLogin         = document.getElementById("btn-login");
-  const btnRegister      = document.getElementById("btn-register");
-  const btnBack0         = document.getElementById("btn-back-0");
-  const btnBack1         = document.getElementById("btn-back-1");
-  const btnBack2         = document.getElementById("btn-back-2");
-  const btnTogglePw      = document.getElementById("btn-toggle-pw");
-  const btnForgot        = document.getElementById("btn-forgot");
-  const inputUsername    = document.getElementById("input-username");
-  const inputPassword    = document.getElementById("input-password");
-  const inputRegPw       = document.getElementById("input-reg-password");
-  const inputRegPw2      = document.getElementById("input-reg-password2");
-
+  const $ = id => document.getElementById(id);
   let pendingUsername = "";
 
-  // ── Step 0 → Step 1 ──
-  btnUsernameMode.addEventListener("click", () => {
+  // Step 0 → 1
+  $("btn-username").addEventListener("click", () => {
     showAuthStep("auth-step-1", "forward");
-    setTimeout(() => inputUsername && inputUsername.focus(), 350);
+    setTimeout(() => $("input-username")?.focus(), 340);
   });
+  $("btn-back-0").addEventListener("click", () => showAuthStep("auth-step-0", "back"));
 
-  // ── Step 1: back ──
-  btnBack0.addEventListener("click", () => {
-    showAuthStep("auth-step-0", "back");
-  });
-
-  // ── Step 1: continue (check if user exists) ──
-  btnContinueUser.addEventListener("click", async () => {
-    const username = (inputUsername.value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
-    if (!username || username.length < 3) {
-      showToast("Минимум 3 символа, только a-z 0-9 _", "error");
-      shakeElement("input-username");
-      return;
-    }
-    pendingUsername = username;
-
-    setButtonLoading(btnContinueUser, true);
-    showAuthLoader(true);
-
+  // Step 1: Continue
+  $("btn-continue-username").addEventListener("click", async () => {
+    const raw = ($("input-username").value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g,"");
+    if (raw.length < 3) { showToast("Мин. 3 символа (a-z 0-9 _)", "error"); shake("input-username"); return; }
+    pendingUsername = raw;
+    const btn = $("btn-continue-username");
+    setButtonLoading(btn, true); authLoader(true);
     try {
-      const userDoc = await getDoc(doc(firestore, "users", username));
-
-      if (userDoc.exists()) {
-        // User found → go to password step
-        document.getElementById("step2-username-display").textContent = `@${username}`;
+      const snap = await getDoc(doc(firestore, "users", raw));
+      if (snap.exists()) {
+        $("step2-username-display").textContent = `@${raw}`;
         showAuthStep("auth-step-2", "forward");
-        setTimeout(() => inputPassword && inputPassword.focus(), 350);
+        setTimeout(() => $("input-password")?.focus(), 340);
       } else {
-        // User not found → go to register step
-        document.getElementById("reg-username-label").textContent = `@${username}`;
+        $("reg-username-label").textContent = `@${raw}`;
         showAuthStep("auth-step-3", "forward");
-        setTimeout(() => inputRegPw && inputRegPw.focus(), 350);
+        setTimeout(() => $("input-reg-password")?.focus(), 340);
       }
-    } catch (err) {
-      console.error("[Auth] Check user error:", err);
-      showToast("Ошибка соединения с базой данных", "error");
-    } finally {
-      setButtonLoading(btnContinueUser, false);
-      showAuthLoader(false);
-    }
+    } catch(e) {
+      console.error(e); showToast("Ошибка соединения", "error");
+    } finally { setButtonLoading(btn, false); authLoader(false); }
   });
+  $("input-username").addEventListener("keydown", e => { if(e.key==="Enter") $("btn-continue-username").click(); });
 
-  // Allow Enter key on username input
-  inputUsername && inputUsername.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btnContinueUser.click();
-  });
+  // Step 2: Back
+  $("btn-back-1").addEventListener("click", () => showAuthStep("auth-step-1", "back"));
 
-  // ── Step 2: back ──
-  btnBack1.addEventListener("click", () => {
-    showAuthStep("auth-step-1", "back");
-  });
-
-  // ── Step 2: login ──
-  btnLogin.addEventListener("click", async () => {
-    const password = inputPassword.value;
-    if (!password) {
-      showToast("Введи пароль", "error");
-      shakeElement("input-password");
-      return;
-    }
-
-    setButtonLoading(btnLogin, true);
-    showAuthLoader(true);
-
+  // Step 2: Login
+  $("btn-login").addEventListener("click", async () => {
+    const pw = $("input-password").value;
+    if (!pw) { showToast("Введи пароль", "error"); shake("input-password"); return; }
+    const btn = $("btn-login");
+    setButtonLoading(btn, true); authLoader(true);
     try {
-      const userDoc  = await getDoc(doc(firestore, "users", pendingUsername));
-      if (!userDoc.exists()) {
-        showToast("Пользователь не найден", "error");
-        return;
+      const snap = await getDoc(doc(firestore, "users", pendingUsername));
+      if (!snap.exists()) { showToast("Пользователь не найден", "error"); return; }
+      const data = snap.data();
+      const hash = await sha256(pw);
+      if (data.passwordHash !== hash) {
+        showToast("Неверный пароль", "error"); shake("input-password");
+        $("input-password").value = ""; return;
       }
-
-      const data     = userDoc.data();
-      const hashed   = await hashPassword(password);
-
-      if (data.passwordHash !== hashed) {
-        showToast("Неверный пароль", "error");
-        shakeElement("input-password");
-        inputPassword.value = "";
-        return;
-      }
-
-      // ✅ Logged in
-      session.uid         = pendingUsername;
-      session.username    = pendingUsername;
-      session.displayName = data.displayName || pendingUsername;
-      session.bio         = data.bio || "";
-      session.rep         = data.rep || 0;
-
-      // Update last seen
-      await updateDoc(doc(firestore, "users", pendingUsername), {
-        lastSeen: serverTimestamp(),
-        online:   true,
+      Object.assign(session, {
+        uid: pendingUsername, username: pendingUsername,
+        displayName: data.displayName || pendingUsername,
+        bio: data.bio || "", rep: data.rep || 0,
+        avatarUrl: data.avatarUrl || null,
       });
-
-      showToast(`Добро пожаловать, @${session.username}!`, "success");
+      await updateDoc(doc(firestore, "users", pendingUsername), { lastSeen: serverTimestamp(), online: true });
+      showToast(`Добро пожаловать, @${session.username}! 🔮`, "success");
       onSuccess(session);
+    } catch(e) {
+      console.error(e); showToast("Ошибка при входе", "error");
+    } finally { setButtonLoading(btn, false); authLoader(false); }
+  });
+  $("input-password").addEventListener("keydown", e => { if(e.key==="Enter") $("btn-login").click(); });
 
-    } catch (err) {
-      console.error("[Auth] Login error:", err);
-      showToast("Ошибка при входе", "error");
-    } finally {
-      setButtonLoading(btnLogin, false);
-      showAuthLoader(false);
-    }
+  // Toggle password
+  $("btn-toggle-pw").addEventListener("click", () => {
+    const inp = $("input-password");
+    inp.type = inp.type === "text" ? "password" : "text";
+    const icon = $("btn-toggle-pw").querySelector("i");
+    if (icon) { icon.setAttribute("data-lucide", inp.type === "text" ? "eye-off" : "eye"); if(window.lucide) lucide.createIcons(); }
   });
 
-  inputPassword && inputPassword.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btnLogin.click();
-  });
-
-  // ── Toggle password visibility ──
-  btnTogglePw && btnTogglePw.addEventListener("click", () => {
-    const isText = inputPassword.type === "text";
-    inputPassword.type = isText ? "password" : "text";
-    btnTogglePw.querySelector("i").setAttribute("data-lucide", isText ? "eye" : "eye-off");
-    if (window.lucide) lucide.createIcons();
-  });
-
-  // ── Forgot password ──
-  btnForgot && btnForgot.addEventListener("click", (e) => {
+  // Forgot password
+  $("btn-forgot")?.addEventListener("click", e => {
     e.preventDefault();
-    showModal({
-      title: "Сброс пароля",
-      body:  "Эта функция пока недоступна. Свяжись с администратором.<br><br><span style=\"font-family:var(--font-mono);font-size:12px;color:var(--text-muted);\">@Smashh</span>",
-      actions: [{ label: "Понял", className: "modal-btn--primary" }],
-    });
+    showModal({ title:"Сброс пароля", body:"Свяжись с администратором: <b>@Smashh</b>", actions:[{label:"Понял",className:"modal-btn--primary"}] });
   });
 
-  // ── Step 3: back ──
-  btnBack2.addEventListener("click", () => {
-    showAuthStep("auth-step-1", "back");
-  });
+  // Step 3: Back
+  $("btn-back-2").addEventListener("click", () => showAuthStep("auth-step-1", "back"));
 
-  // ── Step 3: register ──
-  btnRegister.addEventListener("click", async () => {
-    const pw1 = inputRegPw.value;
-    const pw2 = inputRegPw2.value;
-
-    if (pw1.length < 6) {
-      showToast("Минимум 6 символов", "error");
-      shakeElement("input-reg-password");
-      return;
-    }
-    if (pw1 !== pw2) {
-      showToast("Пароли не совпадают", "error");
-      shakeElement("input-reg-password2");
-      return;
-    }
-
-    setButtonLoading(btnRegister, true);
-    showAuthLoader(true);
-
+  // Step 3: Register
+  $("btn-register").addEventListener("click", async () => {
+    const pw1 = $("input-reg-password").value;
+    const pw2 = $("input-reg-password2").value;
+    if (pw1.length < 6) { showToast("Мин. 6 символов", "error"); shake("input-reg-password"); return; }
+    if (pw1 !== pw2)   { showToast("Пароли не совпадают", "error"); shake("input-reg-password2"); return; }
+    const btn = $("btn-register");
+    setButtonLoading(btn, true); authLoader(true);
     try {
-      const hashed = await hashPassword(pw1);
-
-      const userData = {
-        username:     pendingUsername,
-        displayName:  pendingUsername,
-        passwordHash: hashed,
-        bio:          "",
-        rep:          0,
-        createdAt:    serverTimestamp(),
-        lastSeen:     serverTimestamp(),
-        online:       true,
-      };
-
-      await setDoc(doc(firestore, "users", pendingUsername), userData);
-
-      session.uid         = pendingUsername;
-      session.username    = pendingUsername;
-      session.displayName = pendingUsername;
-      session.bio         = "";
-      session.rep         = 0;
-
-      showToast(`Аккаунт @${pendingUsername} создан!`, "success");
+      const hash = await sha256(pw1);
+      await setDoc(doc(firestore, "users", pendingUsername), {
+        username: pendingUsername, displayName: pendingUsername,
+        passwordHash: hash, bio: "", rep: 0, avatarUrl: null,
+        createdAt: serverTimestamp(), lastSeen: serverTimestamp(), online: true,
+      });
+      Object.assign(session, { uid: pendingUsername, username: pendingUsername, displayName: pendingUsername, bio: "", rep: 0, avatarUrl: null });
+      showToast(`Аккаунт @${pendingUsername} создан! 🎉`, "success");
       onSuccess(session);
-
-    } catch (err) {
-      console.error("[Auth] Register error:", err);
-      showToast("Ошибка при регистрации", "error");
-    } finally {
-      setButtonLoading(btnRegister, false);
-      showAuthLoader(false);
-    }
+    } catch(e) {
+      console.error(e); showToast("Ошибка при регистрации", "error");
+    } finally { setButtonLoading(btn, false); authLoader(false); }
   });
+  $("input-reg-password2").addEventListener("keydown", e => { if(e.key==="Enter") $("btn-register").click(); });
+}
 
-  inputRegPw2 && inputRegPw2.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") btnRegister.click();
-  });
+// ── CHANGE PASSWORD ──
+export async function changePassword(oldPw, newPw1, newPw2) {
+  if (!session.username) return false;
+  if (newPw1.length < 6)   { showToast("Новый пароль мин. 6 символов", "error"); return false; }
+  if (newPw1 !== newPw2)   { showToast("Новые пароли не совпадают", "error");  return false; }
+  try {
+    const snap = await getDoc(doc(firestore, "users", session.username));
+    if (!snap.exists()) return false;
+    const oldHash = await sha256(oldPw);
+    if (snap.data().passwordHash !== oldHash) { showToast("Старый пароль неверен", "error"); return false; }
+    const newHash = await sha256(newPw1);
+    await updateDoc(doc(firestore, "users", session.username), { passwordHash: newHash });
+    showToast("Пароль успешно изменён ✓", "success");
+    return true;
+  } catch(e) {
+    console.error(e); showToast("Ошибка смены пароля", "error"); return false;
+  }
 }
 
 // ── LOGOUT ──
 export async function logoutUser() {
-  try {
-    if (session.username) {
-      await updateDoc(doc(firestore, "users", session.username), { online: false });
-    }
-  } catch (_) {}
-
-  session.uid         = null;
-  session.username    = null;
-  session.displayName = null;
-  session.bio         = "";
-  session.rep         = 0;
+  if (session.username) {
+    try { await updateDoc(doc(firestore,"users",session.username),{online:false,lastSeen:serverTimestamp()}); } catch(_){}
+  }
+  Object.assign(session, { uid:null, username:null, displayName:null, bio:"", rep:0, avatarUrl:null });
 }
 
-// ── HELPERS ──
-function showAuthLoader(show) {
-  const el = document.getElementById("auth-loader");
-  if (!el) return;
-  el.classList.toggle("hidden", !show);
-}
-
-function shakeElement(id) {
+function authLoader(show) { document.getElementById("auth-loader")?.classList.toggle("hidden", !show); }
+function shake(id) {
   const el = document.getElementById(id);
-  if (!el || !window.gsap) return;
-  gsap.fromTo(
-    el,
-    { x: -8 },
-    { x: 0, duration: 0.4, ease: "elastic.out(1, 0.3)" }
-  );
+  if (el && window.gsap) gsap.fromTo(el, { x:-8 }, { x:0, duration:.4, ease:"elastic.out(1,.3)" });
 }
+
+export { sha256 };

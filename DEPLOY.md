@@ -1,135 +1,97 @@
-// ═══════════════════════════════════════════════════════
-// MYSTERY CHAT · DEPLOYMENT GUIDE
-// ═══════════════════════════════════════════════════════
+# Mystery Chat v2.0 · Deploy Guide
+# Made by Smashh
 
-/*
-  ██████████████████████████████████████████████████████
-  СТРУКТУРА ФАЙЛОВ:
-  ██████████████████████████████████████████████████████
+## ══ Firestore Rules ══
+# Вставить в Firebase Console → Firestore → Rules
 
-  mystery-chat/
-  ├── index.html          ← Точка входа SPA
-  ├── styles.css          ← Весь CSS (глассморфизм, VHS, dark)
-  ├── firebase-config.js  ← Firebase v10 init + экспорты
-  ├── three-bg.js         ← Three.js частицы + glitch шейдер
-  ├── ui-animations.js    ← GSAP переходы, тосты, модалы, навигация
-  ├── auth.js             ← Username+Password авторизация через Firestore
-  ├── chat.js             ← Чаты, поиск, сообщения в реальном времени
-  ├── bot-utils.js        ← Telegram Bot API утилиты (placeholder)
-  ├── app.js              ← Главный оркестратор
-  └── DEPLOY.md           ← Этот файл
-
-  ██████████████████████████████████████████████████████
-  FIRESTORE RULES (вставь в Firebase Console → Firestore → Rules)
-  ██████████████████████████████████████████████████████
-*/
-
-const FIRESTORE_RULES = `
+```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
     match /users/{username} {
-      // Чтение: любой аутентифицированный (через session, проверяем по наличию документа)
-      // Запись: только сам пользователь (по username)
-      allow read: if true;
+      allow read:   if true;
       allow create: if request.resource.data.username == username;
-      allow update: if request.resource.data.keys().hasOnly([
-        'online', 'lastSeen', 'bio', 'displayName', 'rep', 'passwordHash'
-      ]);
+      allow update: if true;
       allow delete: if false;
     }
 
-    // Conversations collection
     match /conversations/{convId} {
-      allow read, write: if true;  // Замени на auth-based позже
-
-      // Messages subcollection
+      allow read, write: if true;
       match /messages/{msgId} {
         allow read, write: if true;
       }
     }
   }
 }
-`;
+```
 
-/*
-  ██████████████████████████████████████████████████████
-  FIREBASE INDEXES (Firestore → Indexes → добавь вручную)
-  ██████████████████████████████████████████████████████
+## ══ Firebase Storage Rules ══
+# Firebase Console → Storage → Rules
 
-  Collection: conversations
-  Fields:
-    - members (Array)
-    - updatedAt (Descending)
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /avatars/{userId}/{allPaths=**} {
+      allow read:  if true;
+      allow write: if request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+    match /chats/{convId}/{allPaths=**} {
+      allow read:  if true;
+      allow write: if request.resource.size < 25 * 1024 * 1024;
+    }
+  }
+}
+```
 
-  Collection: users
-  Fields:
-    - username (Ascending)
+## ══ Firestore Indexes ══
+# Firebase Console → Firestore → Indexes → Create composite index
 
-  ██████████████████████████████████████████████████████
-  КАК ЗАПУСТИТЬ ЛОКАЛЬНО:
-  ██████████████████████████████████████████████████████
+1. Collection: conversations
+   Fields: members (Arrays) + updatedAt (Descending)
+   Query scope: Collection
 
-  1. Установи Live Server (VSCode расширение) или:
-     npx serve .
+2. Collection: users  
+   Fields: username (Ascending)
+   Query scope: Collection
 
-  2. Открой http://localhost:3000 (или 5500)
+## ══ File Structure ══
+```
+mystery-chat/
+├── index.html          ← SPA entry point
+├── styles.css          ← All CSS (5 themes, glassmorphism, reactions)
+├── firebase-config.js  ← Firebase v10 init
+├── three-bg.js         ← Three.js particles + GLSL glitch shader
+├── ui-animations.js    ← GSAP transitions, toasts, modals, themes
+├── auth.js             ← Username/password auth + change password
+├── chat.js             ← Realtime chat, file uploads, reactions, search
+├── games.js            ← 4 playable games (Snake/Tetris/2048/Pong) + stock avatars
+├── bot-utils.js        ← Telegram Bot API placeholder
+└── app.js              ← Main orchestrator
+```
 
-  3. Важно: сервер нужен для ES modules (import/export)
-     Нельзя открывать index.html через file:// !
+## ══ GitHub Pages Hosting ══
+Your setup (GitHub → main branch → root) already works.
+Just push all files to the repo root.
 
-  ██████████████████████████████████████████████████████
-  ДЕПЛОЙ НА FIREBASE HOSTING:
-  ██████████████████████████████████████████████████████
-
-  npm install -g firebase-tools
-  firebase login
-  firebase init hosting
-    → Public directory: . (текущая папка)
-    → Single-page app: Yes
-    → Overwrite index.html: No
-  firebase deploy
-
-  ██████████████████████████════════════════════════════
-  FIRESTORE COLLECTIONS (создаются автоматически):
-  ══════════════════════════════════════════════════════
-
-  users/{username}
-    - username: string
-    - displayName: string
-    - passwordHash: string (SHA-256 + salt)
-    - bio: string
-    - rep: number
-    - online: boolean
-    - lastSeen: Timestamp
-    - createdAt: Timestamp
-
-  conversations/{user1__user2}
-    - members: string[] (sorted)
-    - lastMessage: string
-    - updatedAt: Timestamp
-    - unreadCount: { [username]: number }
-
-  conversations/{id}/messages/{msgId}
-    - text: string
-    - sender: string
-    - createdAt: Timestamp
-
-  ══════════════════════════════════════════════════════
-  TELEGRAM BOT SETUP (bot-utils.js):
-  ══════════════════════════════════════════════════════
-
-  BOT_TOKEN = "8709058432:AAEIqd4-owgpFyAdDOnqrG_mgsv5mJxaCJs"
-  ADMIN_UID = "6226164273"
-
-  Для продакшена: перенеси Bot API вызовы в Cloud Functions!
-  Не держи токен на клиенте в реальном проекте.
-
-  ══════════════════════════════════════════════════════
-  СДЕЛАНО BY SMASHH · Mystery Chat v1.0.0
-  ══════════════════════════════════════════════════════
-*/
-
-module.exports = { FIRESTORE_RULES };
+## ══ New Features v2 ══
+- ✅ Chat list shows existing conversations
+- ✅ Click peer avatar/name → full profile panel
+- ✅ Reputation system (+/-) with 24h cooldown
+- ✅ Rep display: green if positive, red if negative
+- ✅ Message context menu (long press 500ms / right click)
+- ✅ Reactions: ❤️ 👍 👎 🙂 🔥
+- ✅ Double-click message → heart reaction
+- ✅ Delete for me (local) / Delete for all (Firestore)
+- ✅ Clear history: for me only OR for both
+- ✅ File/image/video attachments (up to 25 MB)
+- ✅ Firebase Storage for files and avatars (up to 5 MB)
+- ✅ 10 stock avatars (Minecraft pixel art)
+- ✅ Custom avatar upload with size validation
+- ✅ Real password change (old + new + confirm)
+- ✅ 5 themes: Dark, Light, Neon, Ocean, Sunset
+- ✅ Search opens as full overlay (not inside chat list)
+- ✅ 4 fully playable games via blob URLs (no iframe CSP issues)
+- ✅ Shared media gallery in peer profile panel

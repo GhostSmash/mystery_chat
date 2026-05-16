@@ -1,439 +1,552 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Mystery Chat</title>
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
-
-  <!-- Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-
-  <!-- GSAP -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-
-  <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- ═══════════════════════════════════════════ -->
-  <!-- THREE.JS CANVAS BACKGROUND                 -->
-  <!-- ═══════════════════════════════════════════ -->
-  <canvas id="bg-canvas"></canvas>
+<!-- ═══ THREE.JS BG ═══ -->
+<canvas id="bg-canvas"></canvas>
 
-  <!-- ═══════════════════════════════════════════ -->
-  <!-- GLOBAL TOAST NOTIFICATION                  -->
-  <!-- ═══════════════════════════════════════════ -->
-  <div id="toast-container"></div>
+<!-- ═══ TOASTS ═══ -->
+<div id="toast-container"></div>
 
-  <!-- ═══════════════════════════════════════════ -->
-  <!-- CUSTOM MODAL OVERLAY                       -->
-  <!-- ═══════════════════════════════════════════ -->
-  <div id="modal-overlay" class="hidden">
-    <div id="modal-box">
-      <div id="modal-title"></div>
-      <div id="modal-body"></div>
-      <div id="modal-actions"></div>
+<!-- ═══ MODAL ═══ -->
+<div id="modal-overlay" class="hidden">
+  <div id="modal-box">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div id="modal-actions"></div>
+  </div>
+</div>
+
+<!-- ═══ MESSAGE CONTEXT MENU ═══ -->
+<div id="msg-ctx-menu" class="msg-ctx-menu hidden">
+  <div class="ctx-reactions">
+    <button class="ctx-emoji" data-emoji="❤️">❤️</button>
+    <button class="ctx-emoji" data-emoji="👍">👍</button>
+    <button class="ctx-emoji" data-emoji="👎">👎</button>
+    <button class="ctx-emoji" data-emoji="🙂">🙂</button>
+    <button class="ctx-emoji" data-emoji="🔥">🔥</button>
+  </div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item" id="ctx-copy">
+    <i data-lucide="copy" width="14" height="14"></i>
+    Копировать
+  </div>
+  <div class="ctx-item" id="ctx-del-me">
+    <i data-lucide="eye-off" width="14" height="14"></i>
+    Удалить у себя
+  </div>
+  <div class="ctx-item ctx-danger" id="ctx-del-all">
+    <i data-lucide="trash-2" width="14" height="14"></i>
+    Удалить у всех
+  </div>
+</div>
+
+<!-- ═══ SEARCH OVERLAY ═══ -->
+<div id="search-overlay" class="search-overlay hidden">
+  <div class="search-overlay-header">
+    <button id="btn-close-search" class="search-close-btn">
+      <i data-lucide="arrow-left" width="20" height="20"></i>
+    </button>
+    <div class="search-input-wrap">
+      <i data-lucide="search" width="15" height="15" class="search-input-icon"></i>
+      <input type="text" id="search-overlay-input" class="search-overlay-input"
+        placeholder="Найти пользователя..." autocomplete="off" spellcheck="false" />
+      <button id="btn-clear-overlay-search" class="hidden"
+        style="color:var(--text-muted);padding:4px;flex-shrink:0;">
+        <i data-lucide="x" width="14" height="14"></i>
+      </button>
     </div>
   </div>
+  <div id="search-overlay-results" class="search-overlay-results">
+    <div class="search-overlay-hint">
+      <i data-lucide="users" width="36" height="36"></i>
+      <p>Начни вводить имя пользователя</p>
+    </div>
+  </div>
+</div>
 
-  <!-- ═══════════════════════════════════════════ -->
-  <!-- APP ROOT                                   -->
-  <!-- ═══════════════════════════════════════════ -->
-  <div id="app">
-
-    <!-- ─────────────────────────────────── -->
-    <!-- SCREEN: AUTH                        -->
-    <!-- ─────────────────────────────────── -->
-    <div id="screen-auth" class="screen active">
-      <div class="auth-container">
-
-        <!-- Logo & Splash -->
-        <div class="auth-logo-wrap">
-          <div class="auth-logo">
-            <div class="logo-hexagon">
-              <span class="logo-icon">?</span>
-            </div>
-          </div>
-          <h1 class="auth-title">Mystery Chat</h1>
-          <p class="auth-subtitle">Войди, если не боишься</p>
-
-          <!-- Minecraft Splash Text -->
-          <div id="splash-text" class="splash-text"></div>
-        </div>
-
-        <!-- ─── STEP 0: Choose Auth Method ─── -->
-        <div id="auth-step-0" class="auth-step">
-          <button id="btn-google" class="auth-btn auth-btn--disabled" disabled>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Sign in with Google
-            <span class="coming-soon-badge">Coming soon</span>
-          </button>
-
-          <div class="auth-divider"><span>или</span></div>
-
-          <button id="btn-username" class="auth-btn auth-btn--primary">
-            <i data-lucide="user" width="18" height="18"></i>
-            Sign in with Username
-          </button>
-        </div>
-
-        <!-- ─── STEP 1: Enter Username ─── -->
-        <div id="auth-step-1" class="auth-step" style="display:none;">
-          <div class="input-group">
-            <label class="input-label">Имя пользователя</label>
-            <div class="input-wrap">
-              <i data-lucide="at-sign" class="input-icon" width="16" height="16"></i>
-              <input type="text" id="input-username" class="mc-input" placeholder="username" autocomplete="off" spellcheck="false" />
-            </div>
-          </div>
-          <div class="auth-actions">
-            <button class="auth-btn auth-btn--ghost" id="btn-back-0">← Назад</button>
-            <button class="auth-btn auth-btn--primary" id="btn-continue-username">Продолжить</button>
-          </div>
-        </div>
-
-        <!-- ─── STEP 2: Enter Password ─── -->
-        <div id="auth-step-2" class="auth-step" style="display:none;">
-          <div class="step2-user-badge" id="step2-username-display"></div>
-          <div class="input-group">
-            <label class="input-label">Пароль</label>
-            <div class="input-wrap">
-              <i data-lucide="lock" class="input-icon" width="16" height="16"></i>
-              <input type="password" id="input-password" class="mc-input" placeholder="••••••••" autocomplete="current-password" />
-              <button class="input-toggle-pw" id="btn-toggle-pw" tabindex="-1">
-                <i data-lucide="eye" width="15" height="15"></i>
-              </button>
-            </div>
-            <a href="#" class="forgot-link" id="btn-forgot">Forgot Password?</a>
-          </div>
-          <div class="auth-actions">
-            <button class="auth-btn auth-btn--ghost" id="btn-back-1">← Назад</button>
-            <button class="auth-btn auth-btn--primary" id="btn-login">Войти</button>
-          </div>
-        </div>
-
-        <!-- ─── STEP 3: Register ─── -->
-        <div id="auth-step-3" class="auth-step" style="display:none;">
-          <p class="register-hint">Пользователь <strong id="reg-username-label"></strong> не найден. Зарегистрироваться?</p>
-          <div class="input-group">
-            <label class="input-label">Придумай пароль</label>
-            <div class="input-wrap">
-              <i data-lucide="lock" class="input-icon" width="16" height="16"></i>
-              <input type="password" id="input-reg-password" class="mc-input" placeholder="минимум 6 символов" />
-            </div>
-          </div>
-          <div class="input-group" style="margin-top:12px;">
-            <label class="input-label">Повтори пароль</label>
-            <div class="input-wrap">
-              <i data-lucide="shield-check" class="input-icon" width="16" height="16"></i>
-              <input type="password" id="input-reg-password2" class="mc-input" placeholder="••••••••" />
-            </div>
-          </div>
-          <div class="auth-actions">
-            <button class="auth-btn auth-btn--ghost" id="btn-back-2">← Назад</button>
-            <button class="auth-btn auth-btn--primary" id="btn-register">Создать аккаунт</button>
-          </div>
-        </div>
-
-        <!-- Loading overlay for auth -->
-        <div id="auth-loader" class="auth-loader hidden">
-          <div class="loader-ring"></div>
-        </div>
-
+<!-- ═══ PEER PROFILE PANEL ═══ -->
+<div id="peer-profile-panel" class="peer-panel hidden">
+  <div class="peer-panel-header">
+    <button class="header-btn" id="btn-close-peer-panel">
+      <i data-lucide="arrow-left" width="20" height="20"></i>
+    </button>
+    <span class="peer-panel-title">Профиль</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="peer-panel-body">
+    <!-- Hero -->
+    <div class="peer-panel-hero">
+      <div class="peer-avatar-wrap">
+        <img id="pp-avatar" src="" alt="avatar" class="pp-avatar-img"
+          onerror="this.src='https://minotar.net/helm/MHF_Steve/100.png'" />
+        <div class="pp-avatar-glow"></div>
+      </div>
+      <h2 class="pp-name" id="pp-name">—</h2>
+      <p class="pp-tag"  id="pp-tag">@—</p>
+      <div class="pp-status" id="pp-status">
+        <span class="status-dot"></span><span>В сети</span>
       </div>
     </div>
 
-    <!-- ─────────────────────────────────── -->
-    <!-- SCREEN: MAIN HUB                    -->
-    <!-- ─────────────────────────────────── -->
-    <div id="screen-main" class="screen" style="display:none;">
-
-      <!-- TOP HEADER -->
-      <header class="app-header">
-        <button class="header-btn" id="btn-header-menu">
-          <i data-lucide="menu" width="20" height="20"></i>
+    <!-- Reputation -->
+    <div class="pp-rep-section" id="pp-rep-section">
+      <div class="pp-rep-count" id="pp-rep-count"></div>
+      <div class="pp-rep-btns">
+        <button class="pp-rep-btn pp-rep-plus" id="pp-rep-plus">
+          <i data-lucide="thumbs-up" width="16" height="16"></i>
+          <span>+Репутация</span>
         </button>
-        <div class="header-center">
-          <span class="header-title">Mystery Chat</span>
-          <div id="header-splash" class="header-splash"></div>
+        <button class="pp-rep-btn pp-rep-minus" id="pp-rep-minus">
+          <i data-lucide="thumbs-down" width="16" height="16"></i>
+          <span>−Репутация</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bio -->
+    <div class="pp-bio-section">
+      <div class="pp-section-label">О себе</div>
+      <p class="pp-bio" id="pp-bio">—</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="pp-stats">
+      <div class="pp-stat">
+        <div class="pp-stat-val" id="pp-stat-msg">…</div>
+        <div class="pp-stat-label">Сообщений</div>
+      </div>
+      <div class="pp-stat">
+        <div class="pp-stat-val" id="pp-stat-chats">…</div>
+        <div class="pp-stat-label">Чатов</div>
+      </div>
+      <div class="pp-stat">
+        <div class="pp-stat-val" id="pp-stat-joined">…</div>
+        <div class="pp-stat-label">Дата</div>
+      </div>
+    </div>
+
+    <!-- Action -->
+    <div class="pp-actions">
+      <button class="pp-action-btn" id="btn-pp-message">
+        <i data-lucide="message-circle" width="18" height="18"></i>
+        Написать сообщение
+      </button>
+    </div>
+
+    <!-- Shared media -->
+    <div class="pp-media-section">
+      <div class="pp-section-label">Медиа</div>
+      <div id="pp-media-grid" class="pp-media-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HIDDEN FILE INPUTS ═══ -->
+<input type="file" id="file-input" class="hidden"
+  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar" />
+<input type="file" id="avatar-file-input" class="hidden" accept="image/*" />
+
+<!-- ═══════════════════════════════════════
+     APP ROOT
+════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ════ SCREEN: AUTH ════ -->
+  <div id="screen-auth" class="screen active">
+    <div class="auth-container">
+
+      <div class="auth-logo-wrap">
+        <div class="auth-logo">
+          <div class="logo-hexagon"><span class="logo-icon">?</span></div>
         </div>
-        <button class="header-btn" id="btn-header-search">
-          <i data-lucide="search" width="20" height="20"></i>
+        <!-- Title with splash above-right -->
+        <div class="auth-splash-wrap">
+          <div id="auth-splash" class="splash-text"></div>
+          <h1 class="auth-title">Mystery Chat</h1>
+        </div>
+        <p class="auth-subtitle">Войди, если не боишься</p>
+      </div>
+
+      <!-- Step 0: Choose method -->
+      <div id="auth-step-0" class="auth-step">
+        <button id="btn-google" class="auth-btn auth-btn--disabled" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Sign in with Google
+          <span class="coming-soon-badge">Coming soon</span>
         </button>
-      </header>
+        <div class="auth-divider"><span>или</span></div>
+        <button id="btn-username" class="auth-btn auth-btn--primary">
+          <i data-lucide="user" width="16" height="16"></i>
+          Sign in with Username
+        </button>
+      </div>
 
-      <!-- TAB CONTENT AREA -->
-      <div class="tab-content-area">
+      <!-- Step 1: Username -->
+      <div id="auth-step-1" class="auth-step" style="display:none;">
+        <div class="input-group">
+          <label class="input-label">Имя пользователя</label>
+          <div class="input-wrap">
+            <i data-lucide="at-sign" class="input-icon" width="16" height="16"></i>
+            <input type="text" id="input-username" class="mc-input"
+              placeholder="username" autocomplete="off" spellcheck="false" inputmode="latin" />
+          </div>
+        </div>
+        <div class="auth-actions">
+          <button class="auth-btn auth-btn--ghost" id="btn-back-0">← Назад</button>
+          <button class="auth-btn auth-btn--primary" id="btn-continue-username">Продолжить</button>
+        </div>
+      </div>
 
-        <!-- ── TAB: CHATS ── -->
-        <div id="tab-chats" class="tab-panel active">
-          <!-- Search bar -->
-          <div class="chat-search-bar">
-            <i data-lucide="search" width="15" height="15" class="chat-search-icon"></i>
-            <input type="text" id="chat-search-input" class="chat-search-input" placeholder="Поиск пользователей..." autocomplete="off" />
-            <button id="btn-clear-search" class="clear-search-btn hidden">
-              <i data-lucide="x" width="14" height="14"></i>
+      <!-- Step 2: Password -->
+      <div id="auth-step-2" class="auth-step" style="display:none;">
+        <div class="step2-user-badge" id="step2-username-display"></div>
+        <div class="input-group">
+          <label class="input-label">Пароль</label>
+          <div class="input-wrap">
+            <i data-lucide="lock" class="input-icon" width="16" height="16"></i>
+            <input type="password" id="input-password" class="mc-input"
+              placeholder="••••••••" autocomplete="current-password" />
+            <button class="input-toggle-pw" id="btn-toggle-pw" tabindex="-1">
+              <i data-lucide="eye" width="14" height="14"></i>
             </button>
           </div>
-
-          <!-- Search results (hidden when empty) -->
-          <div id="search-results-panel" class="search-results-panel hidden">
-            <div class="search-section-label">Пользователи</div>
-            <div id="search-results-list"></div>
-          </div>
-
-          <!-- Chat list -->
-          <div id="chat-list" class="chat-list"></div>
-
-          <!-- Empty state -->
-          <div id="chats-empty" class="chats-empty hidden">
-            <div class="empty-icon">💬</div>
-            <p>Пока нет чатов</p>
-            <span>Нажми + чтобы начать</span>
-          </div>
-
-          <!-- FAB Button -->
-          <button id="fab-new-chat" class="fab-btn">
-            <i data-lucide="pencil" width="22" height="22"></i>
-          </button>
+          <a href="#" class="forgot-link" id="btn-forgot">Forgot Password?</a>
         </div>
+        <div class="auth-actions">
+          <button class="auth-btn auth-btn--ghost" id="btn-back-1">← Назад</button>
+          <button class="auth-btn auth-btn--primary" id="btn-login">Войти</button>
+        </div>
+      </div>
 
-        <!-- ── TAB: SETTINGS ── -->
-        <div id="tab-settings" class="tab-panel" style="display:none;">
-          <div class="settings-wrap">
-            <div class="settings-profile-card">
-              <div class="settings-avatar" id="settings-avatar"></div>
-              <div class="settings-profile-info">
-                <div class="settings-display-name" id="settings-display-name">—</div>
-                <div class="settings-username" id="settings-username">@—</div>
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-section-title">Аккаунт</div>
-              <div class="settings-item" id="setting-change-password">
-                <i data-lucide="key-round" width="18" height="18"></i>
-                <span>Сменить пароль</span>
-                <i data-lucide="chevron-right" width="16" height="16" class="settings-arrow"></i>
-              </div>
-              <div class="settings-item" id="setting-notifications">
-                <i data-lucide="bell" width="18" height="18"></i>
-                <span>Уведомления</span>
-                <div class="settings-toggle" id="notif-toggle">
-                  <div class="toggle-knob"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-section-title">Вид</div>
-              <div class="settings-item" id="setting-theme">
-                <i data-lucide="palette" width="18" height="18"></i>
-                <span>Тема</span>
-                <span class="settings-value">Тёмная</span>
-              </div>
-              <div class="settings-item" id="setting-bg-intensity">
-                <i data-lucide="sparkles" width="18" height="18"></i>
-                <span>Интенсивность фона</span>
-                <input type="range" min="0" max="100" value="60" class="settings-slider" id="bg-intensity-slider" />
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-section-title">Опасная зона</div>
-              <div class="settings-item settings-item--danger" id="setting-logout">
-                <i data-lucide="log-out" width="18" height="18"></i>
-                <span>Выйти из аккаунта</span>
-              </div>
-            </div>
-
-            <div class="settings-footer">
-              Mystery Chat v1.0.0 · Made by Smashh
-            </div>
+      <!-- Step 3: Register -->
+      <div id="auth-step-3" class="auth-step" style="display:none;">
+        <p class="register-hint">
+          Пользователь <strong id="reg-username-label"></strong> не найден. Зарегистрироваться?
+        </p>
+        <div class="input-group">
+          <label class="input-label">Придумай пароль</label>
+          <div class="input-wrap">
+            <i data-lucide="lock" class="input-icon" width="16" height="16"></i>
+            <input type="password" id="input-reg-password" class="mc-input" placeholder="минимум 6 символов" />
           </div>
         </div>
-
-        <!-- ── TAB: GAMES ── -->
-        <div id="tab-games" class="tab-panel" style="display:none;">
-          <div class="games-grid">
-            <div class="game-card" data-game="2048" data-url="https://play2048.co/">
-              <div class="game-card-icon">🔢</div>
-              <div class="game-card-title">2048</div>
-              <div class="game-card-desc">Складывай числа</div>
-            </div>
-            <div class="game-card" data-game="tetris" data-url="https://tetris.com/play-tetris">
-              <div class="game-card-icon">🟦</div>
-              <div class="game-card-title">Tetris</div>
-              <div class="game-card-desc">Классика навсегда</div>
-            </div>
-            <div class="game-card" data-game="snake" data-url="https://playsnake.org/">
-              <div class="game-card-icon">🐍</div>
-              <div class="game-card-title">Snake</div>
-              <div class="game-card-desc">Ешь и не умирай</div>
-            </div>
-            <div class="game-card" data-game="chess" data-url="https://www.chess.com/play/computer">
-              <div class="game-card-icon">♟️</div>
-              <div class="game-card-title">Chess</div>
-              <div class="game-card-desc">Против AI</div>
-            </div>
-          </div>
-
-          <!-- Game iframe container -->
-          <div id="game-frame-container" class="game-frame-container hidden">
-            <div class="game-frame-header">
-              <button id="btn-close-game">
-                <i data-lucide="arrow-left" width="20" height="20"></i>
-              </button>
-              <span id="game-frame-title">Игра</span>
-              <button id="btn-reload-game">
-                <i data-lucide="refresh-cw" width="18" height="18"></i>
-              </button>
-            </div>
-            <iframe id="game-iframe" src="" sandbox="allow-same-origin allow-scripts allow-forms allow-popups" allowfullscreen></iframe>
+        <div class="input-group" style="margin-top:10px;">
+          <label class="input-label">Повтори пароль</label>
+          <div class="input-wrap">
+            <i data-lucide="shield-check" class="input-icon" width="16" height="16"></i>
+            <input type="password" id="input-reg-password2" class="mc-input" placeholder="••••••••" />
           </div>
         </div>
+        <div class="auth-actions">
+          <button class="auth-btn auth-btn--ghost" id="btn-back-2">← Назад</button>
+          <button class="auth-btn auth-btn--primary" id="btn-register">Создать аккаунт</button>
+        </div>
+      </div>
 
-        <!-- ── TAB: PROFILE ── -->
-        <div id="tab-profile" class="tab-panel" style="display:none;">
-          <div class="profile-wrap">
-            <div class="profile-hero">
-              <div class="profile-avatar-wrap">
-                <img id="profile-avatar-img" src="" alt="avatar" class="profile-avatar-img" />
-                <div class="profile-avatar-glow"></div>
-              </div>
-              <h2 class="profile-name" id="profile-name">—</h2>
-              <p class="profile-tag" id="profile-tag">@—</p>
-              <div class="profile-status">
-                <span class="status-dot"></span>
-                <span>В сети</span>
-              </div>
+      <div id="auth-loader" class="auth-loader hidden">
+        <div class="loader-ring"></div>
+      </div>
+
+    </div>
+  </div><!-- /screen-auth -->
+
+  <!-- ════ SCREEN: MAIN HUB ════ -->
+  <div id="screen-main" class="screen" style="display:none;">
+
+    <!-- Header -->
+    <header class="app-header">
+      <button class="header-btn" id="btn-header-menu">
+        <i data-lucide="menu" width="20" height="20"></i>
+      </button>
+      <div class="header-center">
+        <div class="header-title-wrap">
+          <div id="header-splash" class="header-splash-badge"></div>
+          <span class="header-title">Mystery Chat</span>
+        </div>
+      </div>
+      <button class="header-btn" id="btn-open-search">
+        <i data-lucide="search" width="20" height="20"></i>
+      </button>
+    </header>
+
+    <!-- Tab Content -->
+    <div class="tab-content-area">
+
+      <!-- ── CHATS ── -->
+      <div id="tab-chats" class="tab-panel active">
+        <div id="chat-list" class="chat-list"></div>
+        <div id="chats-empty" class="chats-empty hidden">
+          <div class="empty-icon">💬</div>
+          <p>Нет чатов</p>
+          <span>Нажми карандаш чтобы найти кого-то</span>
+        </div>
+        <button id="fab-new-chat" class="fab-btn">
+          <i data-lucide="pencil" width="20" height="20"></i>
+        </button>
+      </div>
+
+      <!-- ── GAMES ── -->
+      <div id="tab-games" class="tab-panel" style="display:none;">
+        <div class="games-grid" id="games-grid"></div>
+
+        <!-- Game iframe container -->
+        <div id="game-frame-container" class="game-frame-container hidden">
+          <div class="game-frame-header">
+            <button id="btn-close-game" class="header-btn">
+              <i data-lucide="arrow-left" width="20" height="20"></i>
+            </button>
+            <span id="game-frame-title" class="header-title">Игра</span>
+            <button id="btn-reload-game" class="header-btn">
+              <i data-lucide="refresh-cw" width="18" height="18"></i>
+            </button>
+          </div>
+          <iframe id="game-iframe" src=""
+            sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+            allow="autoplay"
+            allowfullscreen></iframe>
+        </div>
+      </div>
+
+      <!-- ── PROFILE ── -->
+      <div id="tab-profile" class="tab-panel" style="display:none;">
+        <div class="profile-wrap">
+          <div class="profile-hero">
+            <div class="profile-avatar-wrap" style="cursor:pointer;" title="Сменить аватарку">
+              <img id="profile-avatar-img" src="" alt="avatar" class="profile-avatar-img"
+                onerror="this.src='https://minotar.net/helm/MHF_Steve/100.png'" />
+              <div class="profile-avatar-glow"></div>
             </div>
-
-            <div class="profile-stats">
-              <div class="stat-card">
-                <div class="stat-value" id="stat-messages">0</div>
-                <div class="stat-label">Сообщений</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value" id="stat-chats">0</div>
-                <div class="stat-label">Чатов</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-value" id="stat-rep">0</div>
-                <div class="stat-label">Репутация</div>
-              </div>
-            </div>
-
-            <div class="profile-section">
-              <div class="profile-section-title">О себе</div>
-              <div class="profile-bio" id="profile-bio">Тайна окутывает всё...</div>
-              <button class="profile-edit-btn" id="btn-edit-bio">
-                <i data-lucide="edit-3" width="14" height="14"></i>
-                Редактировать
-              </button>
+            <h2 class="profile-name" id="profile-name">—</h2>
+            <p class="profile-tag"  id="profile-tag">@—</p>
+            <div class="profile-status">
+              <span class="status-dot"></span><span>В сети</span>
             </div>
           </div>
-        </div>
 
-      </div><!-- /tab-content-area -->
-
-      <!-- BOTTOM NAVIGATION -->
-      <nav class="bottom-nav">
-        <button class="nav-btn active" data-tab="chats">
-          <i data-lucide="message-circle" width="22" height="22"></i>
-          <span>Чаты</span>
-        </button>
-        <button class="nav-btn" data-tab="games">
-          <i data-lucide="gamepad-2" width="22" height="22"></i>
-          <span>Игры</span>
-        </button>
-        <button class="nav-btn" data-tab="profile">
-          <i data-lucide="user-circle" width="22" height="22"></i>
-          <span>Профиль</span>
-        </button>
-        <button class="nav-btn" data-tab="settings">
-          <i data-lucide="settings" width="22" height="22"></i>
-          <span>Настройки</span>
-        </button>
-      </nav>
-
-    </div><!-- /screen-main -->
-
-    <!-- ─────────────────────────────────── -->
-    <!-- SCREEN: CHAT VIEW                   -->
-    <!-- ─────────────────────────────────── -->
-    <div id="screen-chat" class="screen" style="display:none;">
-
-      <!-- Chat Header -->
-      <header class="chat-header">
-        <button class="header-btn" id="btn-back-chat">
-          <i data-lucide="arrow-left" width="20" height="20"></i>
-        </button>
-        <div class="chat-header-info">
-          <img id="chat-peer-avatar" src="" alt="avatar" class="chat-peer-avatar" />
-          <div class="chat-peer-details">
-            <div class="chat-peer-name" id="chat-peer-name">—</div>
-            <div class="chat-peer-status" id="chat-peer-status">последний раз был(а) недавно</div>
+          <div class="profile-stats">
+            <div class="stat-card">
+              <div class="stat-value" id="stat-messages">…</div>
+              <div class="stat-label">Сообщений</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-chats">…</div>
+              <div class="stat-label">Чатов</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-rep">—</div>
+              <div class="stat-label">Репутация</div>
+            </div>
           </div>
-        </div>
-        <button class="header-btn" id="btn-chat-options">
-          <i data-lucide="more-vertical" width="20" height="20"></i>
-        </button>
-      </header>
 
-      <!-- Messages container -->
-      <div id="messages-container" class="messages-container">
-        <div id="messages-list" class="messages-list"></div>
-        <div id="messages-empty" class="messages-empty">
-          <div class="empty-bubble">
-            <span>🌑</span>
-            <p>Напиши первым в темноте...</p>
+          <div class="profile-section">
+            <div class="profile-section-title">О себе</div>
+            <div class="profile-bio" id="profile-bio">Тайна окутывает всё...</div>
+            <button class="profile-edit-btn" id="btn-edit-bio">
+              <i data-lucide="edit-3" width="13" height="13"></i>
+              Редактировать
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Message Input Bar -->
-      <div class="message-input-bar">
-        <button class="attach-btn" id="btn-attach">
+      <!-- ── SETTINGS ── -->
+      <div id="tab-settings" class="tab-panel" style="display:none;">
+        <div class="settings-wrap">
+
+          <!-- Profile card -->
+          <div class="settings-profile-card">
+            <div class="settings-avatar-wrap">
+              <div class="settings-avatar" id="settings-avatar"></div>
+              <button class="avatar-edit-btn" id="btn-change-avatar" title="Сменить аватарку">
+                <i data-lucide="camera" width="12" height="12"></i>
+              </button>
+            </div>
+            <div class="settings-profile-info">
+              <div class="settings-display-name" id="settings-display-name">—</div>
+              <div class="settings-username" id="settings-username">@—</div>
+            </div>
+          </div>
+
+          <!-- Account -->
+          <div class="settings-section">
+            <div class="settings-section-title">Аккаунт</div>
+            <div class="settings-item" id="setting-change-password">
+              <i data-lucide="key-round" width="18" height="18"></i>
+              <span>Сменить пароль</span>
+              <i data-lucide="chevron-right" width="16" height="16" class="settings-arrow"></i>
+            </div>
+          </div>
+
+          <!-- Theme -->
+          <div class="settings-section">
+            <div class="settings-section-title">Тема оформления</div>
+            <div class="theme-picker" id="theme-picker">
+              <button class="theme-btn active" data-theme="dark">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#05060a,#0f1120)"></div>
+                <span>Тёмная</span>
+              </button>
+              <button class="theme-btn" data-theme="light">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#f0f2f5,#e8ecf0)"></div>
+                <span>Светлая</span>
+              </button>
+              <button class="theme-btn" data-theme="neon">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#0d0021,#ff00ff22)"></div>
+                <span>Неон</span>
+              </button>
+              <button class="theme-btn" data-theme="ocean">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#020d1a,#00b4d822)"></div>
+                <span>Океан</span>
+              </button>
+              <button class="theme-btn" data-theme="sunset">
+                <div class="theme-preview" style="background:linear-gradient(135deg,#1a0808,#ff6b3522)"></div>
+                <span>Закат</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Background -->
+          <div class="settings-section">
+            <div class="settings-section-title">Фон</div>
+            <div class="settings-item" style="cursor:default;">
+              <i data-lucide="sparkles" width="18" height="18"></i>
+              <span>Интенсивность частиц</span>
+              <input type="range" min="0" max="100" value="60" class="settings-slider" id="bg-intensity-slider" />
+            </div>
+          </div>
+
+          <!-- Danger -->
+          <div class="settings-section">
+            <div class="settings-section-title">Аккаунт</div>
+            <div class="settings-item settings-item--danger" id="setting-logout">
+              <i data-lucide="log-out" width="18" height="18"></i>
+              <span>Выйти из аккаунта</span>
+            </div>
+          </div>
+
+          <div class="settings-footer">Mystery Chat v2.0 · Made with 🔮 by Smashh</div>
+        </div>
+      </div>
+
+    </div><!-- /tab-content-area -->
+
+    <!-- Bottom Nav -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="chats">
+        <i data-lucide="message-circle" width="22" height="22"></i>
+        <span>Чаты</span>
+      </button>
+      <button class="nav-btn" data-tab="games">
+        <i data-lucide="gamepad-2" width="22" height="22"></i>
+        <span>Игры</span>
+      </button>
+      <button class="nav-btn" data-tab="profile">
+        <i data-lucide="user-circle" width="22" height="22"></i>
+        <span>Профиль</span>
+      </button>
+      <button class="nav-btn" data-tab="settings">
+        <i data-lucide="settings" width="22" height="22"></i>
+        <span>Настройки</span>
+      </button>
+    </nav>
+
+  </div><!-- /screen-main -->
+
+  <!-- ════ SCREEN: CHAT VIEW ════ -->
+  <div id="screen-chat" class="screen" style="display:none;">
+
+    <!-- Chat Header -->
+    <header class="chat-header">
+      <button class="header-btn" id="btn-back-chat">
+        <i data-lucide="arrow-left" width="20" height="20"></i>
+      </button>
+      <!-- Clicking avatar/name opens peer profile -->
+      <div class="chat-header-info" id="chat-header-info" style="cursor:pointer;" title="Открыть профиль">
+        <img id="chat-peer-avatar" src="" alt="avatar" class="chat-peer-avatar"
+          onerror="this.src='https://minotar.net/helm/MHF_Steve/100.png'" />
+        <div class="chat-peer-details">
+          <div class="chat-peer-name" id="chat-peer-name">—</div>
+          <div class="chat-peer-status" id="chat-peer-status">последний раз был(а) недавно</div>
+        </div>
+      </div>
+      <button class="header-btn" id="btn-chat-options">
+        <i data-lucide="more-vertical" width="20" height="20"></i>
+      </button>
+    </header>
+
+    <!-- Messages -->
+    <div id="messages-container" class="messages-container">
+      <div id="messages-list" class="messages-list"></div>
+      <div id="messages-empty" class="messages-empty">
+        <div class="empty-bubble">
+          <span>🌑</span>
+          <p>Напиши первым в темноте...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Bar -->
+    <div class="message-input-bar">
+      <!-- Attach popup menu -->
+      <div id="attach-menu" class="attach-menu hidden">
+        <button class="attach-menu-item" id="attach-photo">
+          <i data-lucide="image" width="18" height="18"></i>
+          <span>Фото / Видео</span>
+        </button>
+        <button class="attach-menu-item" id="attach-file">
+          <i data-lucide="file" width="18" height="18"></i>
+          <span>Файл (до 25 МБ)</span>
+        </button>
+      </div>
+      <div class="msg-bar-inner">
+        <button class="attach-btn" id="btn-attach" title="Прикрепить файл">
           <i data-lucide="paperclip" width="20" height="20"></i>
         </button>
         <div class="message-input-wrap">
-          <textarea id="message-input" class="message-textarea" placeholder="Сообщение..." rows="1"></textarea>
+          <textarea id="message-input" class="message-textarea"
+            placeholder="Сообщение..." rows="1"></textarea>
         </div>
-        <button class="send-btn" id="btn-send-message">
+        <button class="send-btn" id="btn-send-message" title="Отправить">
           <i data-lucide="send" width="18" height="18"></i>
         </button>
       </div>
+    </div>
 
-    </div><!-- /screen-chat -->
+  </div><!-- /screen-chat -->
 
-  </div><!-- /app -->
+</div><!-- /app -->
 
-  <!-- JS Modules -->
-  <script type="module" src="firebase-config.js"></script>
-  <script type="module" src="three-bg.js"></script>
-  <script type="module" src="ui-animations.js"></script>
-  <script type="module" src="auth.js"></script>
-  <script type="module" src="chat.js"></script>
-  <script type="module" src="bot-utils.js"></script>
-  <script type="module" src="app.js"></script>
+<!-- JS Modules (order matters) -->
+<script type="module" src="firebase-config.js"></script>
+<script type="module" src="three-bg.js"></script>
+<script type="module" src="ui-animations.js"></script>
+<script type="module" src="auth.js"></script>
+<script type="module" src="games.js"></script>
+<script type="module" src="chat.js"></script>
+<script type="module" src="bot-utils.js"></script>
+<script type="module" src="app.js"></script>
 
 </body>
 </html>
