@@ -1,10 +1,9 @@
-// ═══════════════════════════════════════════════════════
-// firebase-config.js  ·  Mystery Chat v2
+э// ═══════════════════════════════════════════════════════
+// firebase-config.js  ·  Mystery Chat v3.0
 // ═══════════════════════════════════════════════════════
 import { initializeApp }  from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth }        from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore }   from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage }     from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyDW9jyliZDMF9tvQ_06FaHx016FAFcDR48",
@@ -19,6 +18,7 @@ const firebaseConfig = {
 const app       = initializeApp(firebaseConfig);
 const auth      = getAuth(app);
 const firestore = getFirestore(app);
-const storage   = getStorage(app);
 
-export { app, auth, firestore, storage };
+// Экспортируем только то, что реально нужно для v3
+export { app, auth, firestore };
+

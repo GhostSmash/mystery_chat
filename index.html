@@ -9,14 +9,18 @@
   <meta name="theme-color" content="#05060a" />
   <title>Mystery Chat</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Libraries (classic scripts, NOT modules — load synchronously before our code) -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
@@ -71,7 +75,7 @@
       <input type="text" id="search-overlay-input" class="search-overlay-input"
         placeholder="Найти пользователя..." autocomplete="off" spellcheck="false" />
       <button id="btn-clear-overlay-search" class="hidden"
-        style="color:var(--text-muted);padding:4px;flex-shrink:0;background:none;border:none;cursor:pointer;">
+        style="color:var(--text-muted);padding:4px;background:none;border:none;cursor:pointer;flex-shrink:0;">
         <i data-lucide="x" width="14" height="14"></i>
       </button>
     </div>
@@ -94,6 +98,7 @@
     <div style="width:40px;"></div>
   </div>
   <div class="peer-panel-body">
+    <!-- Hero -->
     <div class="peer-panel-hero">
       <div class="peer-avatar-wrap">
         <img id="pp-avatar" src="" alt="avatar" class="pp-avatar-img"
@@ -106,7 +111,6 @@
         <span class="status-dot"></span><span>В сети</span>
       </div>
     </div>
-
     <!-- Reputation -->
     <div class="pp-rep-section">
       <div class="pp-rep-count" id="pp-rep-count"></div>
@@ -121,13 +125,11 @@
         </button>
       </div>
     </div>
-
     <!-- Bio -->
     <div class="pp-bio-section">
       <div class="pp-section-label">О себе</div>
       <p class="pp-bio" id="pp-bio">—</p>
     </div>
-
     <!-- Stats -->
     <div class="pp-stats">
       <div class="pp-stat">
@@ -143,8 +145,7 @@
         <div class="pp-stat-label">Дата</div>
       </div>
     </div>
-
-    <!-- Write button -->
+    <!-- Action -->
     <div class="pp-actions">
       <button class="pp-action-btn" id="btn-pp-message">
         <i data-lucide="message-circle" width="18" height="18"></i>
@@ -154,12 +155,12 @@
   </div>
 </div>
 
-<!-- ═══ HIDDEN FILE INPUTS ═══ -->
+<!-- ═══ HIDDEN INPUTS ═══ -->
 <input type="file" id="avatar-file-input" class="hidden" accept="image/*" />
 
-<!-- ═══════════════════════════════════════
+<!-- ════════════════════════════════════════════════════
      APP ROOT
-════════════════════════════════════════ -->
+═════════════════════════════════════════════════════ -->
 <div id="app">
 
   <!-- ════ SCREEN: AUTH ════ -->
@@ -177,7 +178,7 @@
         <p class="auth-subtitle">Войди, если не боишься</p>
       </div>
 
-      <!-- Step 0 -->
+      <!-- Step 0: method select -->
       <div id="auth-step-0" class="auth-step">
         <button id="btn-google" class="auth-btn auth-btn--disabled" disabled>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
@@ -196,7 +197,7 @@
         </button>
       </div>
 
-      <!-- Step 1: Username -->
+      <!-- Step 1: username -->
       <div id="auth-step-1" class="auth-step" style="display:none;">
         <div class="input-group">
           <label class="input-label">Имя пользователя</label>
@@ -212,7 +213,7 @@
         </div>
       </div>
 
-      <!-- Step 2: Password -->
+      <!-- Step 2: password -->
       <div id="auth-step-2" class="auth-step" style="display:none;">
         <div class="step2-user-badge" id="step2-username-display"></div>
         <div class="input-group">
@@ -227,7 +228,6 @@
           </div>
           <a href="#" class="forgot-link" id="btn-forgot">Forgot Password?</a>
         </div>
-        <!-- Remember me -->
         <label class="remember-row">
           <input type="checkbox" id="remember-me-checkbox" class="remember-cb" />
           <span class="remember-label">Запомнить меня</span>
@@ -238,7 +238,7 @@
         </div>
       </div>
 
-      <!-- Step 3: Register -->
+      <!-- Step 3: register -->
       <div id="auth-step-3" class="auth-step" style="display:none;">
         <p class="register-hint">
           Пользователь <strong id="reg-username-label"></strong> не найден. Зарегистрироваться?
@@ -247,14 +247,16 @@
           <label class="input-label">Придумай пароль</label>
           <div class="input-wrap">
             <i data-lucide="lock" class="input-icon" width="16" height="16"></i>
-            <input type="password" id="input-reg-password" class="mc-input" placeholder="минимум 6 символов" />
+            <input type="password" id="input-reg-password" class="mc-input"
+              placeholder="минимум 6 символов" />
           </div>
         </div>
         <div class="input-group" style="margin-top:10px;">
           <label class="input-label">Повтори пароль</label>
           <div class="input-wrap">
             <i data-lucide="shield-check" class="input-icon" width="16" height="16"></i>
-            <input type="password" id="input-reg-password2" class="mc-input" placeholder="••••••••" />
+            <input type="password" id="input-reg-password2" class="mc-input"
+              placeholder="••••••••" />
           </div>
         </div>
         <div class="auth-actions">
@@ -290,7 +292,7 @@
 
     <div class="tab-content-area">
 
-      <!-- ── CHATS ── -->
+      <!-- CHATS -->
       <div id="tab-chats" class="tab-panel active">
         <div id="chat-list" class="chat-list"></div>
         <div id="chats-empty" class="chats-empty hidden">
@@ -303,7 +305,7 @@
         </button>
       </div>
 
-      <!-- ── GAMES ── -->
+      <!-- GAMES -->
       <div id="tab-games" class="tab-panel" style="display:none;">
         <div class="games-grid" id="games-grid"></div>
         <div id="game-frame-container" class="game-frame-container hidden">
@@ -322,7 +324,7 @@
         </div>
       </div>
 
-      <!-- ── PROFILE ── -->
+      <!-- PROFILE -->
       <div id="tab-profile" class="tab-panel" style="display:none;">
         <div class="profile-wrap">
           <div class="profile-hero">
@@ -362,25 +364,23 @@
         </div>
       </div>
 
-      <!-- ── SETTINGS ── -->
+      <!-- SETTINGS -->
       <div id="tab-settings" class="tab-panel" style="display:none;">
         <div class="settings-wrap">
 
-          <!-- Profile card -->
           <div class="settings-profile-card">
             <div class="settings-avatar-wrap">
               <div class="settings-avatar" id="settings-avatar"></div>
-              <button class="avatar-edit-btn" id="btn-change-avatar" title="Сменить аватарку">
+              <button class="avatar-edit-btn" id="btn-change-avatar">
                 <i data-lucide="camera" width="12" height="12"></i>
               </button>
             </div>
             <div class="settings-profile-info">
               <div class="settings-display-name" id="settings-display-name">—</div>
-              <div class="settings-username" id="settings-username">@—</div>
+              <div class="settings-username"     id="settings-username">@—</div>
             </div>
           </div>
 
-          <!-- Account -->
           <div class="settings-section">
             <div class="settings-section-title">Аккаунт</div>
             <div class="settings-item" id="setting-change-password">
@@ -390,7 +390,6 @@
             </div>
           </div>
 
-          <!-- Themes — full 10-theme picker -->
           <div class="settings-section">
             <div class="settings-section-title">Тема оформления</div>
             <div class="theme-picker" id="theme-picker">
@@ -399,7 +398,7 @@
                 <span>Тёмная</span>
               </button>
               <button class="theme-btn" data-theme="light">
-                <div class="theme-preview" style="background:linear-gradient(135deg,#eef1f8,#ffffff)"></div>
+                <div class="theme-preview" style="background:linear-gradient(135deg,#eef1f8,#fff)"></div>
                 <span>Светлая</span>
               </button>
               <button class="theme-btn" data-theme="neon">
@@ -431,43 +430,41 @@
                 <span>Полночь</span>
               </button>
               <button class="theme-btn" data-theme="liquid">
-                <div class="theme-preview" style="background:linear-gradient(135deg,rgba(180,160,255,.3),rgba(160,240,220,.3),rgba(255,200,100,.3))"></div>
+                <div class="theme-preview"
+                  style="background:linear-gradient(135deg,rgba(180,160,255,.4),rgba(160,240,220,.4),rgba(255,200,100,.4))"></div>
                 <span>Liquid ✨</span>
               </button>
             </div>
-            <!-- Liquid Glass warning hint (always visible) -->
             <div class="liquid-warn">
               <span>⚠️</span>
-              <span>Liquid Glass использует тяжёлый blur — может тормозить на слабых устройствах</span>
+              <span>Liquid Glass — тяжёлый blur, может тормозить на слабых устройствах</span>
             </div>
           </div>
 
-          <!-- Background -->
           <div class="settings-section">
             <div class="settings-section-title">Фон</div>
             <div class="settings-item" style="cursor:default;">
               <i data-lucide="sparkles" width="18" height="18"></i>
               <span>Интенсивность частиц</span>
-              <input type="range" min="0" max="100" value="60" class="settings-slider" id="bg-intensity-slider" />
+              <input type="range" min="0" max="100" value="60"
+                class="settings-slider" id="bg-intensity-slider" />
             </div>
           </div>
 
-          <!-- Danger -->
           <div class="settings-section">
-            <div class="settings-section-title">Аккаунт</div>
+            <div class="settings-section-title">Опасная зона</div>
             <div class="settings-item settings-item--danger" id="setting-logout">
               <i data-lucide="log-out" width="18" height="18"></i>
               <span>Выйти из аккаунта</span>
             </div>
           </div>
 
-          <div class="settings-footer">Mystery Chat v3.0 · Made with 🔮 by Smashh</div>
+          <div class="settings-footer">Mystery Chat v3.1 · Made with 🔮 by Smashh</div>
         </div>
       </div>
 
     </div><!-- /tab-content-area -->
 
-    <!-- Bottom Nav -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-tab="chats">
         <i data-lucide="message-circle" width="22" height="22"></i>
@@ -520,14 +517,13 @@
       </div>
     </div>
 
-    <!-- Input bar (no attach button — no Storage on free plan) -->
     <div class="message-input-bar">
       <div class="msg-bar-inner">
         <div class="message-input-wrap">
           <textarea id="message-input" class="message-textarea"
             placeholder="Сообщение..." rows="1"></textarea>
         </div>
-        <button class="send-btn" id="btn-send-message" title="Отправить">
+        <button class="send-btn" id="btn-send-message">
           <i data-lucide="send" width="18" height="18"></i>
         </button>
       </div>
@@ -537,14 +533,12 @@
 
 </div><!-- /app -->
 
-<!-- Modules — order matters -->
-<script type="module" src="firebase-config.js"></script>
-<script type="module" src="three-bg.js"></script>
-<script type="module" src="ui-animations.js"></script>
-<script type="module" src="auth.js"></script>
-<script type="module" src="games.js"></script>
-<script type="module" src="chat.js"></script>
-<script type="module" src="bot-utils.js"></script>
+<!--
+  SINGLE module entry point.
+  app.js imports everything else via ES module imports.
+  DOMContentLoaded inside app.js ensures Lucide icons are
+  rendered BEFORE any click listeners are wired.
+-->
 <script type="module" src="app.js"></script>
 
 </body>
