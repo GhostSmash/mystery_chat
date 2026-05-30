@@ -1,7 +1,6 @@
 // ═══════════════════════════════════════════════════════
-// auth.js · Mystery Chat v3.1
-// Fixed: events wired after Lucide, no race conditions
-// Password migration v1→v2, Remember me, Auto-login
+// auth.js · Mystery Chat v3
+// Password hash migration (v1→v2) + "Remember me" auto-login
 // ═══════════════════════════════════════════════════════
 import { firestore } from "./firebase-config.js";
 import { showToast, showAuthStep, showModal, setButtonLoading } from "./ui-animations.js";
@@ -14,94 +13,75 @@ export const session = {
   bio: "", rep: 0, avatarUrl: null,
 };
 
+// Salts: v1 = old, v2 = new
 const SALT_V1 = "mystery_salt_smashh_2024";
 const SALT_V2 = "_mc_salt_v2";
 
-export async function sha256(str, salt) {
-  const enc = new TextEncoder().encode(str + salt);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, "0")).join("");
+async function sha256(str, salt) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str + salt));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// ─────────────────────────────────────────────────────
-// initAuth — called AFTER lucide.createIcons() so all
-// DOM is stable. Returns { tryAutoLogin } so app.js
-// can call auto-login separately after UI is shown.
-// ─────────────────────────────────────────────────────
 export function initAuth(onSuccess) {
+  const $ = id => document.getElementById(id);
   let pendingUsername = "";
 
-  // Helper — never returns null, safe to call after Lucide
-  const el = id => document.getElementById(id);
-
-  // ── Step 0 → 1 ──────────────────────────────────────
-  el("btn-username")?.addEventListener("click", () => {
+  // ── Step 0 → 1 ──
+  $("btn-username")?.addEventListener("click", () => {
     showAuthStep("auth-step-1", "forward");
-    setTimeout(() => el("input-username")?.focus(), 300);
+    setTimeout(() => $("input-username")?.focus(), 350);
   });
+  $("btn-back-0")?.addEventListener("click", () => showAuthStep("auth-step-0", "back"));
 
-  el("btn-back-0")?.addEventListener("click", () => {
-    showAuthStep("auth-step-0", "back");
-  });
-
-  // ── Step 1: Continue ─────────────────────────────────
-  const doStep1 = async () => {
-    const raw = (el("input-username")?.value || "")
-      .trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
-
+  // ── Step 1: Continue ──
+  $("btn-continue-username")?.addEventListener("click", async () => {
+    const raw = ($("input-username")?.value || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     if (raw.length < 3) {
       showToast("Минимум 3 символа (a-z 0-9 _)", "error");
       shake("input-username");
       return;
     }
-
     pendingUsername = raw;
-    const btn = el("btn-continue-username");
+    const btn = $("btn-continue-username");
     setButtonLoading(btn, true);
     authLoader(true);
 
     try {
       const snap = await getDoc(doc(firestore, "users", raw));
       if (snap.exists()) {
-        const nameEl = el("step2-username-display");
-        if (nameEl) nameEl.textContent = `@${raw}`;
+        $("step2-username-display").textContent = `@${raw}`;
         showAuthStep("auth-step-2", "forward");
-        setTimeout(() => el("input-password")?.focus(), 300);
+        setTimeout(() => $("input-password")?.focus(), 350);
       } else {
-        const labelEl = el("reg-username-label");
-        if (labelEl) labelEl.textContent = `@${raw}`;
+        $("reg-username-label").textContent = `@${raw}`;
         showAuthStep("auth-step-3", "forward");
-        setTimeout(() => el("input-reg-password")?.focus(), 300);
+        setTimeout(() => $("input-reg-password")?.focus(), 350);
       }
     } catch (e) {
-      console.error("[Auth step1]", e);
-      showToast("Ошибка соединения с сервером", "error");
+      console.error(e);
+      showToast("Ошибка соединения", "error");
     } finally {
       setButtonLoading(btn, false);
       authLoader(false);
     }
-  };
-
-  el("btn-continue-username")?.addEventListener("click", doStep1);
-  el("input-username")?.addEventListener("keydown", e => {
-    if (e.key === "Enter") doStep1();
+  });
+  $("input-username")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") $("btn-continue-username")?.click();
   });
 
-  el("btn-back-1")?.addEventListener("click", () => {
-    showAuthStep("auth-step-1", "back");
-  });
+  // ── Step 2: Back ──
+  $("btn-back-1")?.addEventListener("click", () => showAuthStep("auth-step-1", "back"));
 
-  // ── Step 2: Login ────────────────────────────────────
-  const doLogin = async () => {
-    const pw = el("input-password")?.value || "";
+  // ── Step 2: Login ──
+  $("btn-login")?.addEventListener("click", async () => {
+    const pw = $("input-password")?.value || "";
     if (!pw) {
       showToast("Введи пароль", "error");
       shake("input-password");
       return;
     }
 
-    const btn = el("btn-login");
+    const btn = $("btn-login");
     setButtonLoading(btn, true);
     authLoader(true);
 
@@ -112,107 +92,105 @@ export function initAuth(onSuccess) {
         return;
       }
 
-      const data        = snap.data();
-      const storedHash  = data.passwordHash || "";
-      const hashV2      = await sha256(pw, SALT_V2);
-      let   ok          = false;
+      const data = snap.data();
+      const storedHash = data.passwordHash;
+
+      // Try v2 hash first
+      const hashV2 = await sha256(pw, SALT_V2);
+      let authenticated = false;
 
       if (storedHash === hashV2) {
-        ok = true;
+        authenticated = true;
       } else {
-        // Fallback: try old salt (v1 migration)
+        // Fallback: try v1 hash (old accounts)
         const hashV1 = await sha256(pw, SALT_V1);
         if (storedHash === hashV1) {
-          ok = true;
-          // Silently upgrade to v2 hash
+          authenticated = true;
+          // Migrate: rehash with v2 salt
           await updateDoc(doc(firestore, "users", pendingUsername), {
             passwordHash: hashV2,
           });
-          console.info("[Auth] Migrated password hash v1→v2 for", pendingUsername);
+          console.info("[Auth] Password migrated from v1 to v2");
         }
       }
 
-      if (!ok) {
+      if (!authenticated) {
         showToast("Неверный пароль", "error");
         shake("input-password");
-        if (el("input-password")) el("input-password").value = "";
+        $("input-password").value = "";
         return;
       }
 
-      // Populate session
+      // Success
       Object.assign(session, {
-        uid:         pendingUsername,
-        username:    pendingUsername,
+        uid: pendingUsername,
+        username: pendingUsername,
         displayName: data.displayName || pendingUsername,
-        bio:         data.bio         || "",
-        rep:         data.rep         || 0,
-        avatarUrl:   data.avatarUrl   || null,
+        bio: data.bio || "",
+        rep: data.rep || 0,
+        avatarUrl: data.avatarUrl || null,
       });
 
       await updateDoc(doc(firestore, "users", pendingUsername), {
-        online: true, lastSeen: serverTimestamp(),
-      }).catch(() => {});
+        lastSeen: serverTimestamp(),
+        online: true,
+      });
 
-      // Remember me
-      if (el("remember-me-checkbox")?.checked) {
+      // Save to localStorage if "remember me" checked
+      const rememberCheckbox = $("remember-me-checkbox");
+      if (rememberCheckbox?.checked) {
         localStorage.setItem("mc_remember", JSON.stringify({
           username: pendingUsername,
-          hash:     hashV2,
+          passwordHash: hashV2,
         }));
       } else {
         localStorage.removeItem("mc_remember");
       }
 
-      showToast(`Добро пожаловать, @${pendingUsername}! 🔮`, "success");
+      showToast(`Добро пожаловать, @${session.username}! 🔮`, "success");
       onSuccess(session);
-
     } catch (e) {
-      console.error("[Auth login]", e);
+      console.error(e);
       showToast("Ошибка при входе", "error");
     } finally {
       setButtonLoading(btn, false);
       authLoader(false);
     }
-  };
-
-  el("btn-login")?.addEventListener("click", doLogin);
-  el("input-password")?.addEventListener("keydown", e => {
-    if (e.key === "Enter") doLogin();
   });
 
-  // Toggle password visibility
-  el("btn-toggle-pw")?.addEventListener("click", () => {
-    const inp = el("input-password");
+  $("input-password")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") $("btn-login")?.click();
+  });
+
+  // ── Toggle password visibility ──
+  $("btn-toggle-pw")?.addEventListener("click", () => {
+    const inp = $("input-password");
     if (!inp) return;
     inp.type = inp.type === "text" ? "password" : "text";
-    // Re-render icon without calling lucide globally
-    const ico = el("btn-toggle-pw")?.querySelector("i");
-    if (ico) {
-      ico.setAttribute("data-lucide", inp.type === "text" ? "eye-off" : "eye");
-      if (window.lucide) lucide.createIcons({ nodes: [ico] });
+    const icon = $("btn-toggle-pw")?.querySelector("i");
+    if (icon) {
+      icon.setAttribute("data-lucide", inp.type === "text" ? "eye-off" : "eye");
+      if (window.lucide) lucide.createIcons();
     }
   });
 
-  // Forgot password
-  el("btn-forgot")?.addEventListener("click", e => {
+  // ── Forgot password ──
+  $("btn-forgot")?.addEventListener("click", e => {
     e.preventDefault();
     showModal({
       title: "Сброс пароля",
-      body:  "Свяжись с администратором: <b style='color:var(--accent)'>@Smashh</b>",
+      body: "Свяжись с администратором: <b>@Smashh</b>",
       actions: [{ label: "Понял", className: "modal-btn--primary" }],
     });
   });
 
-  // ── Step 3: Back from register ───────────────────────
-  el("btn-back-2")?.addEventListener("click", () => {
-    showAuthStep("auth-step-1", "back");
-  });
+  // ── Step 3: Back ──
+  $("btn-back-2")?.addEventListener("click", () => showAuthStep("auth-step-1", "back"));
 
-  // ── Step 3: Register ─────────────────────────────────
-  const doRegister = async () => {
-    const pw1 = el("input-reg-password")?.value  || "";
-    const pw2 = el("input-reg-password2")?.value || "";
-
+  // ── Step 3: Register ──
+  $("btn-register")?.addEventListener("click", async () => {
+    const pw1 = $("input-reg-password")?.value || "";
+    const pw2 = $("input-reg-password2")?.value || "";
     if (pw1.length < 6) {
       showToast("Минимум 6 символов", "error");
       shake("input-reg-password");
@@ -224,130 +202,124 @@ export function initAuth(onSuccess) {
       return;
     }
 
-    const btn = el("btn-register");
+    const btn = $("btn-register");
     setButtonLoading(btn, true);
     authLoader(true);
 
     try {
       const hash = await sha256(pw1, SALT_V2);
       await setDoc(doc(firestore, "users", pendingUsername), {
-        username:     pendingUsername,
-        displayName:  pendingUsername,
+        username: pendingUsername,
+        displayName: pendingUsername,
         passwordHash: hash,
-        bio:          "",
-        rep:          0,
-        avatarUrl:    null,
-        createdAt:    serverTimestamp(),
-        lastSeen:     serverTimestamp(),
-        online:       true,
+        bio: "",
+        rep: 0,
+        avatarUrl: null,
+        createdAt: serverTimestamp(),
+        lastSeen: serverTimestamp(),
+        online: true,
       });
 
       Object.assign(session, {
-        uid:         pendingUsername,
-        username:    pendingUsername,
+        uid: pendingUsername,
+        username: pendingUsername,
         displayName: pendingUsername,
-        bio:         "",
-        rep:         0,
-        avatarUrl:   null,
+        bio: "",
+        rep: 0,
+        avatarUrl: null,
       });
 
       showToast(`Аккаунт @${pendingUsername} создан! 🎉`, "success");
       onSuccess(session);
-
     } catch (e) {
-      console.error("[Auth register]", e);
+      console.error(e);
       showToast("Ошибка при регистрации", "error");
     } finally {
       setButtonLoading(btn, false);
       authLoader(false);
     }
-  };
-
-  el("btn-register")?.addEventListener("click", doRegister);
-  el("input-reg-password2")?.addEventListener("keydown", e => {
-    if (e.key === "Enter") doRegister();
   });
+
+  $("input-reg-password2")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") $("btn-register")?.click();
+  });
+
+  // ── AUTO-LOGIN on page load ──
+  tryAutoLogin(onSuccess);
 }
 
-// ─────────────────────────────────────────────────────
-// Auto-login — called separately AFTER auth screen shown
-// ─────────────────────────────────────────────────────
-export async function tryAutoLogin(onSuccess) {
-  const raw = localStorage.getItem("mc_remember");
-  if (!raw) return false;
-
-  let stored;
-  try { stored = JSON.parse(raw); } catch (_) {
-    localStorage.removeItem("mc_remember"); return false;
-  }
-
-  const { username, hash } = stored || {};
-  if (!username || !hash) {
-    localStorage.removeItem("mc_remember"); return false;
-  }
+// ════════════════════════════════════
+// AUTO-LOGIN
+// ════════════════════════════════════
+async function tryAutoLogin(onSuccess) {
+  const stored = localStorage.getItem("mc_remember");
+  if (!stored) return;
 
   try {
+    const { username, passwordHash } = JSON.parse(stored);
+    if (!username || !passwordHash) return;
+
     const snap = await getDoc(doc(firestore, "users", username));
     if (!snap.exists()) {
-      localStorage.removeItem("mc_remember"); return false;
+      localStorage.removeItem("mc_remember");
+      return;
     }
 
     const data = snap.data();
-    if (data.passwordHash !== hash) {
-      // Password changed — invalidate
-      localStorage.removeItem("mc_remember"); return false;
+    if (data.passwordHash !== passwordHash) {
+      // Hash mismatch — password was changed
+      localStorage.removeItem("mc_remember");
+      return;
     }
 
+    // Success — auto-login
     Object.assign(session, {
-      uid:         username,
-      username:    username,
+      uid: username,
+      username: username,
       displayName: data.displayName || username,
-      bio:         data.bio         || "",
-      rep:         data.rep         || 0,
-      avatarUrl:   data.avatarUrl   || null,
+      bio: data.bio || "",
+      rep: data.rep || 0,
+      avatarUrl: data.avatarUrl || null,
     });
 
     await updateDoc(doc(firestore, "users", username), {
-      online: true, lastSeen: serverTimestamp(),
-    }).catch(() => {});
+      lastSeen: serverTimestamp(),
+      online: true,
+    });
 
-    console.info("[Auth] Auto-login OK:", username);
+    console.info("[Auth] Auto-login successful:", username);
     onSuccess(session);
-    return true;
-
   } catch (e) {
     console.error("[Auth] Auto-login failed:", e);
     localStorage.removeItem("mc_remember");
-    return false;
   }
 }
 
-// ─────────────────────────────────────────────────────
-// Change password
-// ─────────────────────────────────────────────────────
+// ════════════════════════════════════
+// CHANGE PASSWORD
+// ════════════════════════════════════
 export async function changePassword(oldPw, newPw1, newPw2) {
   if (!session.username) return false;
-
-  if (!oldPw) {
-    showToast("Введи старый пароль", "error"); return false;
-  }
   if (newPw1.length < 6) {
-    showToast("Новый пароль мин. 6 символов", "error"); return false;
+    showToast("Новый пароль мин. 6 символов", "error");
+    return false;
   }
   if (newPw1 !== newPw2) {
-    showToast("Новые пароли не совпадают", "error"); return false;
+    showToast("Новые пароли не совпадают", "error");
+    return false;
   }
 
   try {
     const snap = await getDoc(doc(firestore, "users", session.username));
     if (!snap.exists()) return false;
 
-    const stored  = snap.data().passwordHash || "";
-    const oldV2   = await sha256(oldPw, SALT_V2);
-    const oldV1   = await sha256(oldPw, SALT_V1);
+    const oldHashV2 = await sha256(oldPw, SALT_V2);
+    const oldHashV1 = await sha256(oldPw, SALT_V1);
+    const storedHash = snap.data().passwordHash;
 
-    if (stored !== oldV2 && stored !== oldV1) {
-      showToast("Старый пароль неверен", "error"); return false;
+    if (storedHash !== oldHashV2 && storedHash !== oldHashV1) {
+      showToast("Старый пароль неверен", "error");
+      return false;
     }
 
     const newHash = await sha256(newPw1, SALT_V2);
@@ -355,32 +327,35 @@ export async function changePassword(oldPw, newPw1, newPw2) {
       passwordHash: newHash,
     });
 
-    // Update remember-me token if active
-    const rm = localStorage.getItem("mc_remember");
-    if (rm) {
+    // Update localStorage if "remember me" was on
+    const stored = localStorage.getItem("mc_remember");
+    if (stored) {
       localStorage.setItem("mc_remember", JSON.stringify({
-        username: session.username, hash: newHash,
+        username: session.username,
+        passwordHash: newHash,
       }));
     }
 
     showToast("Пароль успешно изменён ✓", "success");
     return true;
-
   } catch (e) {
-    console.error("[Auth] changePassword:", e);
+    console.error(e);
     showToast("Ошибка смены пароля", "error");
     return false;
   }
 }
 
-// ─────────────────────────────────────────────────────
-// Logout
-// ─────────────────────────────────────────────────────
+// ════════════════════════════════════
+// LOGOUT
+// ════════════════════════════════════
 export async function logoutUser() {
   if (session.username) {
-    await updateDoc(doc(firestore, "users", session.username), {
-      online: false, lastSeen: serverTimestamp(),
-    }).catch(() => {});
+    try {
+      await updateDoc(doc(firestore, "users", session.username), {
+        online: false,
+        lastSeen: serverTimestamp(),
+      });
+    } catch (_) {}
   }
   Object.assign(session, {
     uid: null, username: null, displayName: null,
@@ -389,19 +364,18 @@ export async function logoutUser() {
   localStorage.removeItem("mc_remember");
 }
 
-// ─────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────
+// ════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════
 function authLoader(show) {
-  document.getElementById("auth-loader")
-    ?.classList.toggle("hidden", !show);
+  document.getElementById("auth-loader")?.classList.toggle("hidden", !show);
 }
 
 function shake(id) {
   const el = document.getElementById(id);
-  if (!el || !window.gsap) return;
-  gsap.fromTo(el,
-    { x: -9 },
-    { x: 0, duration: .4, ease: "elastic.out(1,.35)" }
-  );
+  if (el && window.gsap) {
+    gsap.fromTo(el, { x: -10 }, { x: 0, duration: .42, ease: "elastic.out(1,.3)" });
+  }
 }
+
+export { sha256 };
